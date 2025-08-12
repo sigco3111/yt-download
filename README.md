@@ -52,6 +52,23 @@ open http://127.0.0.1:3001
 
 ## 초보자용: 1분 설치/실행 가이드
 
+### Windows에서 Docker Desktop 설치(사전 준비)
+- 권장: Windows 10/11 64-bit, WSL2 사용
+- PowerShell(관리자)에서 아래를 순서대로 실행
+```powershell
+# 1) WSL2 설치(재부팅 필요할 수 있음)
+wsl --install
+
+# 2) Docker Desktop 설치(winget)
+winget install -e --id Docker.DockerDesktop
+
+# 3) 재부팅 후 Docker Desktop 실행(고래 아이콘 확인)
+# 4) 동작 확인
+docker version
+```
+- 수동 설치 경로: Docker Desktop 다운로드 페이지(`https://www.docker.com/products/docker-desktop`)
+- 회사 PC 등에서 WSL 설치가 제한될 경우, Docker Desktop 설정에서 Hyper-V 백엔드(Windows Pro/Enterprise) 사용 가능
+
 ### 권장 1) Docker로 한 번에 실행(Windows/macOS)
 ```bash
 ./scripts/run_docker.sh
