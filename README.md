@@ -1,4 +1,4 @@
-# yt-download (로컬 YouTube MP4/MP3 다운로더)
+# 로컬 YouTube MP4/MP3 다운로더
 
 로컬 환경에서 YouTube 영상을 MP4로 저장하거나, 오디오만 추출해 MP3로 저장할 수 있는 경량 도구입니다. FastAPI 서버가 yt-dlp를 통해 포맷 조회/다운로드를 수행하고, 단일 HTML 기반의 Web UI를 함께 제공합니다.
 

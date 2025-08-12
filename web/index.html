@@ -1,95 +1,204 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" class="h-full">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>yt-dlp 로컬 웹 UI</title>
-    <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
-      .box { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 16px; }
-      .row { display: flex; gap: 8px; }
-      input[type=text] { flex: 1; padding: 8px; }
-      button { padding: 8px 12px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-      th, td { border: 1px solid #eee; padding: 6px 8px; font-size: 14px; }
-      th { background: #fafafa; }
-      .muted { color: #666; font-size: 12px; }
-      .error { color: #c00; }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body>
-    <h1>YouTube 다운로드(로컬/yt-dlp)</h1>
-    <div class="row">
-      <input id="url" type="text" placeholder="YouTube URL" />
-      <button id="fetch">포맷 조회</button>
+  <body class="h-full bg-gray-50 text-gray-900">
+    <div id="appRoot" class="mx-auto max-w-3xl px-4 py-8">
+      <header class="mb-6">
+        <h1 class="text-2xl font-semibold tracking-tight">YouTube 다운로드</h1>
+        <p class="mt-1 text-sm text-gray-600">URL 입력 → 포맷 조회 → 해상도/비트레이트 선택 후 다운로드</p>
+      </header>
+
+      <section class="flex gap-2">
+        <input id="url" type="text" placeholder="YouTube URL" class="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button id="fetch" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">포맷 조회</button>
+      </section>
+
+      <div id="status" class="mt-2 text-sm text-gray-600" aria-live="polite"></div>
+
+      <!-- 영상 한 줄 UI: 해상도 선택 + 다운로드 버튼 -->
+      <section class="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-sm font-medium text-gray-800">영상</h3>
+            <p class="mt-1 text-xs text-gray-500">해상도만 선택할 수 있어요. 기본값은 가장 높은 해상도입니다.</p>
+          </div>
+          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <select id="videoSelect" class="w-full min-w-[12rem] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="" disabled selected>포맷을 먼저 조회하세요</option>
+            </select>
+            <button id="videoDownloadBtn" class="inline-flex w-full items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">MP4 다운로드</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 오디오 한 줄 UI: 비트레이트 선택 + 다운로드 버튼 -->
+      <section class="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-sm font-medium text-gray-800">오디오</h3>
+            <p class="mt-1 text-xs text-gray-500">비트레이트만 선택할 수 있어요. 기본값은 가장 높은 비트레이트입니다.</p>
+          </div>
+          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <select id="audioSelect" class="w-full min-w-[12rem] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="" disabled selected>포맷을 먼저 조회하세요</option>
+            </select>
+            <button id="audioDownloadBtn" class="inline-flex w-full items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">MP3 다운로드</button>
+          </div>
+        </div>
+      </section>
+
+      <p class="mt-6 text-xs text-gray-500">문제가 발생하면 네트워크 상태를 확인하고 다시 시도하세요. ffmpeg 설치가 필요할 수 있습니다.</p>
     </div>
-    <div id="status" class="muted" style="margin-top:6px"></div>
-    <div id="progressBox" class="box" style="display:none;">
-      <h3>진행률</h3>
-      <div style="height: 16px; background:#eee; border-radius:8px; overflow:hidden;">
-        <div id="progressBar" style="height:100%; width:0%; background:#4caf50;"></div>
+
+    <!-- 전체 화면 모달: 진행률/상태 표시 및 상호작용 차단 -->
+    <div id="modal" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog">
+      <div class="absolute inset-0 bg-black/40" aria-hidden="true"></div>
+      <div class="relative mx-auto mt-40 w-full max-w-sm px-4">
+        <div class="rounded-xl border border-white/10 bg-white p-5 shadow-xl ring-1 ring-black/5">
+          <h3 class="text-sm font-medium text-gray-800">다운로드 상태</h3>
+          <p id="modalMsg" class="mt-1 text-sm text-gray-600">준비 중...</p>
+          <div class="mt-3 h-3 w-full overflow-hidden rounded-full bg-gray-200">
+            <div id="mProgressBar" class="h-full w-0 rounded-full bg-green-500 transition-[width] duration-200"></div>
+          </div>
+          <div id="mProgressText" class="mt-2 text-xs text-gray-600">0%</div>
+        </div>
       </div>
-      <div id="progressText" class="muted" style="margin-top:6px">0%</div>
-    </div>
-
-    <div class="box">
-      <h3>영상 포맷</h3>
-      <table id="videoTable"><thead><tr><th>format_id</th><th>해상도</th><th>코덱</th><th>동작</th></tr></thead><tbody></tbody></table>
-    </div>
-
-    <div class="box">
-      <h3>오디오 포맷</h3>
-      <table id="audioTable"><thead><tr><th>format_id</th><th>비트레이트</th><th>코덱</th><th>동작</th></tr></thead><tbody></tbody></table>
     </div>
 
     <script>
+      // 목적: DOM 접근 헬퍼
       const $ = (sel) => document.querySelector(sel);
+
+      // 요소 참조
+      const appRoot = $('#appRoot');
       const urlInput = $('#url');
       const statusEl = $('#status');
-      const progressBox = $('#progressBox');
-      const progressBar = $('#progressBar');
-      const progressText = $('#progressText');
-      let currentEventSource = null;
-      const vbody = $('#videoTable tbody');
-      const abody = $('#audioTable tbody');
+      // 모달 요소(진행률 및 상태)
+      const modal = $('#modal');
+      const modalMsg = $('#modalMsg');
+      const mProgressBar = $('#mProgressBar');
+      const mProgressText = $('#mProgressText');
+      const videoSelect = $('#videoSelect');
+      const audioSelect = $('#audioSelect');
+      const videoBtn = $('#videoDownloadBtn');
+      const audioBtn = $('#audioDownloadBtn');
 
+      // 상태: 마지막 조회 결과(포맷 목록)
+      let lastFormats = { video: [], audio: [] };
+      let currentEventSource = null;
+
+      // 포맷 조회 핸들러
       $('#fetch').addEventListener('click', async () => {
-        vbody.innerHTML = ''; abody.innerHTML='';
+        // 목적: 서버에서 포맷 목록을 받아 해상도/비트레이트 드롭다운을 구성
+        // 예외 처리: 실패 시 사용자에게 일반 메시지 제공
         const url = urlInput.value.trim();
         if (!url) { statusEl.textContent = 'URL을 입력하세요.'; return; }
         statusEl.textContent = '조회 중...';
+        disableActions(true);
         try {
           const res = await fetch(`/api/formats?url=${encodeURIComponent(url)}`);
           if (!res.ok) throw new Error('조회 실패');
           const data = await res.json();
           statusEl.textContent = `제목: ${data.title || ''}`;
 
-          (data.video || []).forEach(f => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${f.format_id||''}</td><td>${(f.width||'')+'x'+(f.height||'')}</td><td>${f.vcodec||''}${f.hasAudio?' + audio':''}</td><td><button>MP4로 다운로드</button></td>`;
-            tr.querySelector('button').onclick = () => startDownload(url, 'video', f.format_id);
-            vbody.appendChild(tr);
-          });
+          lastFormats.video = Array.isArray(data.video) ? data.video : [];
+          lastFormats.audio = Array.isArray(data.audio) ? data.audio : [];
 
-          (data.audio || []).forEach(f => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${f.format_id||''}</td><td>${f.tbr||''} kbps</td><td>${f.acodec||''}</td><td><button>MP3로 다운로드</button></td>`;
-            tr.querySelector('button').onclick = () => startDownload(url, 'audio', f.format_id);
-            abody.appendChild(tr);
-          });
+          // 드롭다운 구성: 포맷 ID는 value로 숨기고, 라벨은 해상도/비트레이트만 노출
+          renderVideoOptions(lastFormats.video);
+          renderAudioOptions(lastFormats.audio);
+
+          // 디폴트: 가장 높은 해상도/비트레이트를 선택
+          selectHighestDefaults();
+          disableActions(false);
         } catch (e) {
-          console.error(e); statusEl.innerHTML = '<span class="error">문제가 발생했습니다. 다시 시도해 주세요.</span>';
+          console.error(e);
+          statusEl.innerHTML = '<span class="text-red-600">문제가 발생했습니다. 다시 시도해 주세요.</span>';
+          disableActions(true);
         }
       });
+
+      // 영상 다운로드 버튼
+      videoBtn.addEventListener('click', () => {
+        // 목적: 선택된 해상도에 해당하는 format_id로 영상 다운로드 시작
+        const url = urlInput.value.trim();
+        const formatId = videoSelect.value || '';
+        if (!url || !formatId) { statusEl.textContent = '포맷 조회 후 해상도를 선택하세요.'; return; }
+        startDownload(url, 'video', formatId);
+      });
+
+      // 오디오 다운로드 버튼
+      audioBtn.addEventListener('click', () => {
+        // 목적: 선택된 비트레이트에 해당하는 format_id로 오디오 다운로드 시작
+        const url = urlInput.value.trim();
+        const formatId = audioSelect.value || '';
+        if (!url || !formatId) { statusEl.textContent = '포맷 조회 후 비트레이트를 선택하세요.'; return; }
+        startDownload(url, 'audio', formatId);
+      });
+
+      function renderVideoOptions(videoList) {
+        // 목적: 해상도 드롭다운 옵션을 구성(라벨: 1280x720 등)
+        videoSelect.innerHTML = '';
+        if (!videoList.length) {
+          videoSelect.innerHTML = '<option value="" disabled selected>사용 가능한 해상도가 없습니다</option>';
+          return;
+        }
+        for (const f of videoList) {
+          const label = `${(f.width||'')+'x'+(f.height||'')}${f.hasAudio ? ' (오디오포함)' : ''}`;
+          const opt = document.createElement('option');
+          opt.value = f.format_id || '';
+          opt.textContent = label;
+          videoSelect.appendChild(opt);
+        }
+      }
+
+      function renderAudioOptions(audioList) {
+        // 목적: 비트레이트 드롭다운 옵션을 구성(라벨: 192 kbps 등)
+        audioSelect.innerHTML = '';
+        if (!audioList.length) {
+          audioSelect.innerHTML = '<option value="" disabled selected>사용 가능한 비트레이트가 없습니다</option>';
+          return;
+        }
+        for (const f of audioList) {
+          const br = f.tbr != null ? Math.round(f.tbr) : '';
+          const label = `${br} kbps`;
+          const opt = document.createElement('option');
+          opt.value = f.format_id || '';
+          opt.textContent = label;
+          audioSelect.appendChild(opt);
+        }
+      }
+
+      function selectHighestDefaults() {
+        // 목적: 정렬된 목록의 마지막 항목(최고 해상도/비트레이트)을 기본 선택
+        if (videoSelect.options.length > 0) {
+          videoSelect.selectedIndex = videoSelect.options.length - 1;
+        }
+        if (audioSelect.options.length > 0) {
+          audioSelect.selectedIndex = audioSelect.options.length - 1;
+        }
+      }
+
+      function disableActions(isDisabled) {
+        // 목적: 조회/다운로드 상호작용을 일시 비활성화하여 잘못된 입력 방지
+        videoSelect.disabled = isDisabled;
+        audioSelect.disabled = isDisabled;
+        videoBtn.disabled = isDisabled;
+        audioBtn.disabled = isDisabled;
+      }
 
       async function startDownload(url, type, format_id) {
         // 목적: 다운로드 작업을 생성하고 SSE로 진행률을 표시한 뒤, 완료되면 결과 파일을 다운로드
         // 예외 처리: 네트워크/서버 오류 시 사용자에게 일반적인 오류 메시지 제공
         try {
-          statusEl.textContent = '다운로드 준비...';
-          progressBox.style.display = 'block';
-          progressBar.style.width = '0%';
-          progressText.textContent = '0%';
+          // 다운로드 상태는 모달에서만 노출
+          openModal('다운로드 준비 중...');
+          setModalProgress(0);
 
           // 이전 구독이 있으면 정리
           if (currentEventSource) {
@@ -106,7 +215,8 @@
           const { job_id } = await res.json();
           if (!job_id) throw new Error('job_id 없음');
 
-          statusEl.textContent = '다운로드 진행 중...';
+          // 진행 상태는 모달에서만 노출
+          setModalMessage('다운로드 진행 중...');
 
           // SSE 구독
           const es = new EventSource(`/api/progress/${job_id}`);
@@ -118,27 +228,26 @@
               if (data.type === 'progress') {
                 const percent = (data.percent != null) ? Math.max(0, Math.min(100, data.percent)) : null;
                 if (percent != null) {
-                  progressBar.style.width = `${percent.toFixed(1)}%`;
-                  progressText.textContent = `${percent.toFixed(1)}%` + (data.speed ? ` • ${formatSpeed(data.speed)}` : '') + (data.eta ? ` • ETA ${formatEta(data.eta)}` : '');
+                  setModalProgress(percent);
+                  setModalMessage(`${percent.toFixed(1)}%` + (data.speed ? ` • ${formatSpeed(data.speed)}` : '') + (data.eta ? ` • ETA ${formatEta(data.eta)}` : ''));
                 } else {
                   // 총 크기를 모르는 경우 텍스트만 업데이트
-                  progressText.textContent = '처리 중...';
+                  setModalMessage('처리 중...');
                 }
               } else if (data.type === 'completed') {
                 // 완료: SSE 종료 후 결과 파일 다운로드 트리거
                 try { es.close(); } catch(_) {}
                 currentEventSource = null;
-                // 완료 메시지 업데이트
-                statusEl.textContent = '다운로드 완료';
+                setModalMessage('다운로드 완료. 파일 저장을 시작합니다...');
                 triggerFileDownload(`/api/download/result/${job_id}`);
+                // 약간의 지연 후 모달 닫기(파일 저장 트리거 시간 고려)
+                setTimeout(closeModal, 1200);
               } else if (data.type === 'error') {
-                // 에러 메시지를 무조건 표시하지 않고, 실제로 진행/완료가 전혀 없었을 때만 표기
-                // 일부 환경에서 완료 직후 서버가 스트림 종료 과정에서 에러 이벤트를 보낼 수 있음
+                // 진행/완료 전혀 없을 때만 에러 표기
                 try { es.close(); } catch(_) {}
                 currentEventSource = null;
-                if (progressBar.style.width === '0%') {
-                  statusEl.innerHTML = '<span class="error">다운로드 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.</span>';
-                }
+                setModalMessage('오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+                setTimeout(closeModal, 1500);
               }
             } catch (e) {
               console.error(e);
@@ -146,13 +255,14 @@
           });
 
           es.addEventListener('error', () => {
-            // 네트워크 끊김 등: 서버가 완료 이벤트를 보낸 뒤 닫히는 경우도 있으므로, 상태를 과도하게 경고하지 않음
-            // 진행 중에 에러가 반복되면 재시도 안내
+            // 네트워크 끊김 등: 완료 후 종료 케이스가 있어 과도 경고는 지양
           });
 
         } catch (e) {
           console.error(e);
-          statusEl.innerHTML = '<span class="error">다운로드 실패. 네트워크 또는 서버 상태를 확인하세요.</span>';
+          // 실패 메시지도 모달에서만 노출
+          setModalMessage('다운로드 실패. 네트워크 또는 서버 상태를 확인하세요.');
+          setTimeout(closeModal, 1500);
         }
       }
 
@@ -183,6 +293,33 @@
         const m = Math.floor(s / 60);
         const r = s % 60;
         return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`;
+      }
+
+      // 모달 유틸리티: 열기/닫기/메시지/진행률
+      function openModal(message) {
+        // 목적: 다운로드 중 전체 화면 오버레이로 상호작용을 차단
+        setModalMessage(message || '진행 중...');
+        appRoot.setAttribute('inert', '');
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+      }
+
+      function closeModal() {
+        // 목적: 다운로드 종료 후 상호작용 복구
+        modal.classList.add('hidden');
+        appRoot.removeAttribute('inert');
+        document.body.classList.remove('overflow-hidden');
+        setModalProgress(0);
+      }
+
+      function setModalMessage(msg) {
+        modalMsg.textContent = msg;
+      }
+
+      function setModalProgress(percent) {
+        const p = Math.max(0, Math.min(100, Number(percent) || 0));
+        mProgressBar.style.width = `${p.toFixed(1)}%`;
+        mProgressText.textContent = `${p.toFixed(1)}%`;
       }
     </script>
   </body>
