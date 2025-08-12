@@ -18,6 +18,64 @@
 - Frontend: 순수 HTML/JS (EventSource 기반 SSE 진행률 표시)
 - Infra(Optional): Docker
 
+ 
+
+## 초보자용: 1분 설치/실행 가이드
+
+### Windows: uv로 설치/실행(권장)
+```powershell
+# 0) (선택) 스크립트 실행 허용
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+# 1) Python 3.10+ 설치(없다면)
+winget install -e --id Python.Python.3.10
+
+# 2) uv 설치
+powershell -ExecutionPolicy Bypass -Command "iwr https://astral.sh/uv/install.ps1 -UseBasicParsing | iex"
+uv --version
+
+# 3) 프로젝트 의존성 설치(프로젝트 루트에서)
+cd C:\\work\\yt-download   # 실제 경로로 이동
+uv venv
+.\\.venv\\Scripts\\Activate.ps1
+uv pip install -r requirements.txt
+
+# 4) (권장) FFmpeg 설치 — MP3 변환에 필요
+winget install -e --id Gyan.FFmpeg
+
+# 5) 서버 실행 (주의: uv run 사용하지 마세요)
+# 본 프로젝트는 패키지 레이아웃이 아니어서 `uv run` 시 빌드가 발생하며 실패할 수 있습니다.
+python -m uvicorn server.app:app --host 127.0.0.1 --port 3001 --reload
+```
+브라우저에서 `http://127.0.0.1:3001` 접속
+
+> 참고: 만약 `uv run uvicorn ...` 으로 실행해 "Multiple top-level packages discovered" 오류가 났다면,
+> 가상환경을 활성화한 상태에서 위의 `python -m uvicorn ...` 명령으로 실행하세요.
+
+
+### macOS: uv로 설치/실행(간단)
+```bash
+# 1) uv 설치
+curl -Ls https://astral.sh/uv/install.sh | sh
+source ~/.bashrc 2>/dev/null || true
+source ~/.zshrc 2>/dev/null || true
+
+# 2) 프로젝트 의존성 설치(프로젝트 루트에서)
+cd /path/to/yt-download   # 실제 경로로 이동
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# 3) ffmpeg 설치(필요 시)
+brew install ffmpeg  # Homebrew 미설치면 https://brew.sh 따라 설치
+
+# 4) 서버 실행
+python -m uvicorn server.app:app --host 127.0.0.1 --port 3001 --reload
+```
+브라우저에서 `http://127.0.0.1:3001` 접속
+
+
+
 ## 빠른 시작(개발자 간단 실행)
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -49,98 +107,6 @@ python -m uvicorn server.app:app --host 127.0.0.1 --port 3001 --reload
 ```bash
 open http://127.0.0.1:3001
 ```
-
-## 초보자용: 1분 설치/실행 가이드
-
-### Windows에서 Docker Desktop 설치(사전 준비)
-- 권장: Windows 10/11 64-bit, WSL2 사용
-- PowerShell(관리자)에서 아래를 순서대로 실행
-```powershell
-# 1) WSL2 설치(재부팅 필요할 수 있음)
-wsl --install
-
-# 2) Docker Desktop 설치(winget)
-winget install -e --id Docker.DockerDesktop
-
-# 3) 재부팅 후 Docker Desktop 실행(고래 아이콘 확인)
-# 4) 동작 확인
-docker version
-```
-- 수동 설치 경로: Docker Desktop 다운로드 페이지(`https://www.docker.com/products/docker-desktop`)
-- 회사 PC 등에서 WSL 설치가 제한될 경우, Docker Desktop 설정에서 Hyper-V 백엔드(Windows Pro/Enterprise) 사용 가능
-
-### 권장 1) Docker로 한 번에 실행(Windows/macOS)
-```bash
-./scripts/run_docker.sh
-```
-- 실행 전 Docker Desktop 설치 필요. 스크립트가 이미지 빌드 → 컨테이너 실행 → 브라우저 자동 오픈을 수행합니다.
-
-### Windows: 로컬 실행(winget + 가상환경)
-```powershell
-./scripts/run_local_win.ps1
-```
-- 필요한 경우 Python/FFmpeg 설치 가이드를 출력하고, 가상환경 생성 → 의존성 설치 → 서버 실행을 자동화합니다.
-
-### macOS: 로컬 실행(Homebrew + 가상환경)
-```bash
-chmod +x ./scripts/run_local_mac.sh
-./scripts/run_local_mac.sh
-```
-- ffmpeg 미설치 시 설치 방법을 안내하고, 가상환경 생성 → 의존성 설치 → 서버 실행을 자동화합니다.
-
-실행 후 브라우저에서 `http://127.0.0.1:3001` 로 접속하세요.
-
-### Windows: uv로 설치/실행(대체 방법)
-```powershell
-# 0) (선택) 스크립트 실행 허용
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-
-# 1) Python 3.10+ 설치(없다면)
-winget install -e --id Python.Python.3.10
-
-# 2) uv 설치
-powershell -ExecutionPolicy Bypass -Command "iwr https://astral.sh/uv/install.ps1 -UseBasicParsing | iex"
-uv --version
-
-# 3) 프로젝트 의존성 설치(프로젝트 루트에서)
-cd C:\\work\\yt-download   # 실제 경로로 이동
-uv venv
-.\\.venv\\Scripts\\Activate.ps1
-uv pip install -r requirements.txt
-
-# 4) (권장) FFmpeg 설치 — MP3 변환에 필요
-winget install -e --id Gyan.FFmpeg
-
-# 5) 서버 실행
-uv run uvicorn server.app:app --host 127.0.0.1 --port 3001 --reload
-```
-브라우저에서 `http://127.0.0.1:3001` 접속
-
-### Windows PowerShell 스크립트 실행/문제 해결
-
-- 관리자 PowerShell 권장. 실행 정책이 제한된 경우 아래를 먼저 실행:
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
-- 실행 방법
-```powershell
-cd C:\work\yt-download   # 프로젝트 경로로 이동
-./scripts/run_local_win.ps1
-# 포트를 바꾸려면
-./scripts/run_local_win.ps1 -Port 3002
-```
-- 자주 발생하는 오류와 해결
-  - 실행 정책 오류(Restricted): 위의 `Set-ExecutionPolicy` 실행 후 PowerShell 재시작
-  - 스크립트를 로드할 수 없습니다: 동일하게 실행 정책 완화 필요
-  - 경로 문제(한글/공백 경로): 프로젝트를 `C:\work\yt-download` 같은 영문 경로로 이동하여 재시도
-  - Python/FFmpeg 미설치: 아래 명령으로 설치 후 재시도
-    ```powershell
-    winget install --id Python.Python.3.10 -e
-    winget install --id Gyan.FFmpeg -e
-    ```
-  - 기타: PowerShell 재시작 후 다시 시도. 문제가 지속되면 오류 메시지 전체와 함께 이슈로 남겨주세요.
-
-## 구조(요약)
 - `server/app.py` — FastAPI + yt-dlp 백엔드(API + 정적 UI 서빙, SSE 진행률, 파일명/중복 처리, 결과 전송 후 폴더 정리)
 - `web/index.html` — 단일 파일 Web UI(포맷 조회/선택, 모달 진행률/속도/ETA 표시)
 - `downloads/` — 출력 파일 저장 위치(완료 후 백그라운드 정리)
