@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>yt-dlp 로컬 웹 UI</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
+      .box { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 16px; }
+      .row { display: flex; gap: 8px; }
+      input[type=text] { flex: 1; padding: 8px; }
+      button { padding: 8px 12px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th, td { border: 1px solid #eee; padding: 6px 8px; font-size: 14px; }
+      th { background: #fafafa; }
+      .muted { color: #666; font-size: 12px; }
+      .error { color: #c00; }
+    </style>
+  </head>
+  <body>
+    <h1>YouTube 다운로드(로컬/yt-dlp)</h1>
+    <div class="row">
+      <input id="url" type="text" placeholder="YouTube URL" />
+      <button id="fetch">포맷 조회</button>
+    </div>
+    <div id="status" class="muted" style="margin-top:6px"></div>
+    <div id="progressBox" class="box" style="display:none;">
+      <h3>진행률</h3>
+      <div style="height: 16px; background:#eee; border-radius:8px; overflow:hidden;">
+        <div id="progressBar" style="height:100%; width:0%; background:#4caf50;"></div>
+      </div>
+      <div id="progressText" class="muted" style="margin-top:6px">0%</div>
+    </div>
+
+    <div class="box">
+      <h3>영상 포맷</h3>
+      <table id="videoTable"><thead><tr><th>format_id</th><th>해상도</th><th>코덱</th><th>동작</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="box">
+      <h3>오디오 포맷</h3>
+      <table id="audioTable"><thead><tr><th>format_id</th><th>비트레이트</th><th>코덱</th><th>동작</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <script>
+      const $ = (sel) => document.querySelector(sel);
+      const urlInput = $('#url');
+      const statusEl = $('#status');
+      const progressBox = $('#progressBox');
+      const progressBar = $('#progressBar');
+      const progressText = $('#progressText');
+      let currentEventSource = null;
+      const vbody = $('#videoTable tbody');
+      const abody = $('#audioTable tbody');
+
+      $('#fetch').addEventListener('click', async () => {
+        vbody.innerHTML = ''; abody.innerHTML='';
+        const url = urlInput.value.trim();
+        if (!url) { statusEl.textContent = 'URL을 입력하세요.'; return; }
+        statusEl.textContent = '조회 중...';
+        try {
+          const res = await fetch(`/api/formats?url=${encodeURIComponent(url)}`);
+          if (!res.ok) throw new Error('조회 실패');
+          const data = await res.json();
+          statusEl.textContent = `제목: ${data.title || ''}`;
+
+          (data.video || []).forEach(f => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${f.format_id||''}</td><td>${(f.width||'')+'x'+(f.height||'')}</td><td>${f.vcodec||''}${f.hasAudio?' + audio':''}</td><td><button>MP4로 다운로드</button></td>`;
+            tr.querySelector('button').onclick = () => startDownload(url, 'video', f.format_id);
+            vbody.appendChild(tr);
+          });
+
+          (data.audio || []).forEach(f => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${f.format_id||''}</td><td>${f.tbr||''} kbps</td><td>${f.acodec||''}</td><td><button>MP3로 다운로드</button></td>`;
+            tr.querySelector('button').onclick = () => startDownload(url, 'audio', f.format_id);
+            abody.appendChild(tr);
+          });
+        } catch (e) {
+          console.error(e); statusEl.innerHTML = '<span class="error">문제가 발생했습니다. 다시 시도해 주세요.</span>';
+        }
+      });
+
+      async function startDownload(url, type, format_id) {
+        // 목적: 다운로드 작업을 생성하고 SSE로 진행률을 표시한 뒤, 완료되면 결과 파일을 다운로드
+        // 예외 처리: 네트워크/서버 오류 시 사용자에게 일반적인 오류 메시지 제공
+        try {
+          statusEl.textContent = '다운로드 준비...';
+          progressBox.style.display = 'block';
+          progressBar.style.width = '0%';
+          progressText.textContent = '0%';
+
+          // 이전 구독이 있으면 정리
+          if (currentEventSource) {
+            try { currentEventSource.close(); } catch (_) {}
+            currentEventSource = null;
+          }
+
+          const qs = new URLSearchParams({ url, type });
+          if (format_id) qs.set('format_id', String(format_id));
+
+          // 작업 생성 요청(POST, 쿼리스트링 사용)
+          const res = await fetch(`/api/download/start?${qs.toString()}`, { method: 'POST' });
+          if (!res.ok) throw new Error('작업 시작 실패');
+          const { job_id } = await res.json();
+          if (!job_id) throw new Error('job_id 없음');
+
+          statusEl.textContent = '다운로드 진행 중...';
+
+          // SSE 구독
+          const es = new EventSource(`/api/progress/${job_id}`);
+          currentEventSource = es;
+
+          es.addEventListener('message', (ev) => {
+            try {
+              const data = JSON.parse(ev.data);
+              if (data.type === 'progress') {
+                const percent = (data.percent != null) ? Math.max(0, Math.min(100, data.percent)) : null;
+                if (percent != null) {
+                  progressBar.style.width = `${percent.toFixed(1)}%`;
+                  progressText.textContent = `${percent.toFixed(1)}%` + (data.speed ? ` • ${formatSpeed(data.speed)}` : '') + (data.eta ? ` • ETA ${formatEta(data.eta)}` : '');
+                } else {
+                  // 총 크기를 모르는 경우 텍스트만 업데이트
+                  progressText.textContent = '처리 중...';
+                }
+              } else if (data.type === 'completed') {
+                // 완료: SSE 종료 후 결과 파일 다운로드 트리거
+                try { es.close(); } catch(_) {}
+                currentEventSource = null;
+                // 완료 메시지 업데이트
+                statusEl.textContent = '다운로드 완료';
+                triggerFileDownload(`/api/download/result/${job_id}`);
+              } else if (data.type === 'error') {
+                // 에러 메시지를 무조건 표시하지 않고, 실제로 진행/완료가 전혀 없었을 때만 표기
+                // 일부 환경에서 완료 직후 서버가 스트림 종료 과정에서 에러 이벤트를 보낼 수 있음
+                try { es.close(); } catch(_) {}
+                currentEventSource = null;
+                if (progressBar.style.width === '0%') {
+                  statusEl.innerHTML = '<span class="error">다운로드 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.</span>';
+                }
+              }
+            } catch (e) {
+              console.error(e);
+            }
+          });
+
+          es.addEventListener('error', () => {
+            // 네트워크 끊김 등: 서버가 완료 이벤트를 보낸 뒤 닫히는 경우도 있으므로, 상태를 과도하게 경고하지 않음
+            // 진행 중에 에러가 반복되면 재시도 안내
+          });
+
+        } catch (e) {
+          console.error(e);
+          statusEl.innerHTML = '<span class="error">다운로드 실패. 네트워크 또는 서버 상태를 확인하세요.</span>';
+        }
+      }
+
+      function triggerFileDownload(href) {
+        // 목적: a 태그를 사용해 브라우저 기본 다운로드 동작을 유도
+        const a = document.createElement('a');
+        a.href = href;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
+      function formatSpeed(bytesPerSec) {
+        // 목적: 속도를 보기 좋은 단위로 변환
+        if (!bytesPerSec || bytesPerSec <= 0) return '';
+        const kb = 1024;
+        const mb = kb * 1024;
+        if (bytesPerSec >= mb) return (bytesPerSec / mb).toFixed(1) + ' MB/s';
+        if (bytesPerSec >= kb) return (bytesPerSec / kb).toFixed(1) + ' KB/s';
+        return bytesPerSec.toFixed(0) + ' B/s';
+      }
+
+      function formatEta(sec) {
+        // 목적: ETA(초)를 mm:ss 형태로 변환
+        if (sec == null) return '';
+        const s = Math.max(0, Math.floor(sec));
+        const m = Math.floor(s / 60);
+        const r = s % 60;
+        return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`;
+      }
+    </script>
+  </body>
+  </html>
+
+
+

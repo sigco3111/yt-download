@@ -1,0 +1,39 @@
+name: uv CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        run: curl -Ls https://astral.sh/uv/install.sh | sh
+
+      - name: Sync deps
+        run: ~/.local/bin/uv sync
+
+      - name: Lint (import check)
+        run: |
+          ~/.local/bin/uv run python - <<'PY'
+          import importlib
+          for m in ['fastapi','uvicorn','yt_dlp']:
+              importlib.import_module(m)
+          print('deps_ok')
+          PY
+
+      - name: Build check (uvicorn dry run)
+        run: |
+          ~/.local/bin/uv run python - <<'PY'
+          import importlib
+          import server.app as app_mod
+          print('import_ok', hasattr(app_mod, 'app'))
+          PY
+
+
