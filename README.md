@@ -1,6 +1,6 @@
 # 로컬 YouTube MP4/MP3 다운로더
 
-로컬 환경에서 YouTube 영상을 MP4로 저장하거나, 오디오만 추출해 MP3로 저장할 수 있는 경량 도구입니다. FastAPI 서버가 yt-dlp를 통해 포맷 조회/다운로드를 수행하고, 단일 HTML 기반의 Web UI를 함께 제공합니다.
+로컬 환경에서 YouTube 영상을 MP4로 저장하거나, 오디오만 추출해 MP3로 저장할 수 있는 경량 도구입니다. FastAPI 서버가 yt-dlp를 통해 포맷 조회/다운로드를 수행하고, 단일 HTML 기반 Web UI를 제공합니다.
 
 ## 주요 기능
 - YouTube 영상(MP4) 다운로드 및 오디오(MP3) 추출
@@ -18,7 +18,7 @@
 - Frontend: 순수 HTML/JS (EventSource 기반 SSE 진행률 표시)
 - Infra(Optional): Docker
 
-## 빠른 시작
+## 빠른 시작(개발자 간단 실행)
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -50,29 +50,40 @@ python -m uvicorn server.app:app --host 127.0.0.1 --port 3001 --reload
 open http://127.0.0.1:3001
 ```
 
-## Docker 실행(선택)
-ffmpeg가 포함된 컨테이너로 손쉽게 실행할 수 있습니다.
+## 초보자용: 1분 설치/실행 가이드
 
+### 권장 1) Docker로 한 번에 실행(Windows/macOS)
 ```bash
-docker build -t yt-download:local .
-docker run --rm -p 3001:3001 \
-  -v "$(pwd)/downloads:/app/downloads" \
-  --name yt-download yt-download:local
+./scripts/run_docker.sh
 ```
-접속: http://127.0.0.1:3001
+- 실행 전 Docker Desktop 설치 필요. 스크립트가 이미지 빌드 → 컨테이너 실행 → 브라우저 자동 오픈을 수행합니다.
+
+### Windows: 로컬 실행(winget + 가상환경)
+```powershell
+./scripts/run_local_win.ps1
 ```
+- 필요한 경우 Python/FFmpeg 설치 가이드를 출력하고, 가상환경 생성 → 의존성 설치 → 서버 실행을 자동화합니다.
+
+### macOS: 로컬 실행(Homebrew + 가상환경)
+```bash
+chmod +x ./scripts/run_local_mac.sh
+./scripts/run_local_mac.sh
+```
+- ffmpeg 미설치 시 설치 방법을 안내하고, 가상환경 생성 → 의존성 설치 → 서버 실행을 자동화합니다.
+
+실행 후 브라우저에서 `http://127.0.0.1:3001` 로 접속하세요.
 
 ## 구조(요약)
 - `server/app.py` — FastAPI + yt-dlp 백엔드(API + 정적 UI 서빙, SSE 진행률, 파일명/중복 처리, 결과 전송 후 폴더 정리)
-- `web/index.html` — 단일 파일 Web UI(포맷 조회/선택, 진행률/속도/ETA 표시)
+- `web/index.html` — 단일 파일 Web UI(포맷 조회/선택, 모달 진행률/속도/ETA 표시)
 - `downloads/` — 출력 파일 저장 위치(완료 후 백그라운드 정리)
 
-## 사용법(요약)
-1) URL 입력 후 "포맷 조회" 클릭 → 해상도(영상) / 비트레이트(오디오)별 대표 포맷 목록 표시
-2) 원하는 항목의 "다운로드" 클릭 → 진행률 바(%)·속도·ETA가 표시됩니다
-3) 100%가 되면 브라우저가 자동으로 파일 저장을 시작하고, 서버는 `downloads/` 폴더를 정리합니다
-   - 영상: MP4 저장(필요 시 포맷 병합)
-   - 오디오: MP3(기본 192kbps) 변환(FFmpeg 필요)
+## 사용법(초보자용 요약)
+1) 브라우저에서 `http://127.0.0.1:3001` 접속
+2) 유튜브 URL 입력 → "포맷 조회" 클릭
+3) 해상도/비트레이트 드롭다운에서 원하는 값 선택(기본값은 최고 품질 자동 선택)
+4) "MP4 다운로드" 또는 "MP3 다운로드" 클릭
+5) 다운로드 중에는 전체 화면 모달에 진행률이 표시되며, 완료 시 자동 저장됩니다
 
 ## API
 
@@ -116,26 +127,21 @@ docker run --rm -p 3001:3001 \
 - 저작권이 있는 컨텐츠의 무단 다운로드/배포는 금지되며 모든 책임은 사용자에게 있습니다.
 
 ## PRD 문서
-- docs/PRD.md 를 참고하세요.
+- `docs/PRD.md` 참고
 
 ## 배포 주의
 - 본 서버는 로컬 전용으로 사용하세요(외부에 노출하지 마십시오).
 - 서버는 미디어 바이트를 중계하지 않습니다.
 
 ## 문제해결(트러블슈팅)
-1) 오디오(MP3) 변환 실패/없음
-   - ffmpeg가 설치되어 있는지 확인하세요.
-   - macOS: `brew install ffmpeg` 후 터미널을 재시작하거나 PATH를 재로드하세요.
-2) 네트워크/권한 오류(403/404/Timeout)
-   - URL이 유효한지 확인하고, 네트워크 상태를 점검하세요.
-   - 일시적 문제일 수 있으니 잠시 후 다시 시도하세요.
-3) 저장 공간 부족/권한 문제
-   - `downloads/` 폴더의 여유 공간과 쓰기 권한을 확인하세요.
-4) 원하는 MP4 포맷이 보이지 않음 또는 다운로드 실패
-   - 다른 `format_id`를 선택해 시도하거나, 오디오가 포함된 MP4가 없으면 자동 병합 규칙으로 시도됩니다.
-5) yt-dlp 버전 이슈/포맷 추출 실패
-   - `pip install -U yt-dlp`로 최신 버전으로 업데이트하세요.
-6) 기타 알 수 없는 오류
-   - 다시 시도한 뒤에도 반복되면 네트워크/URL/ffmpeg 설치를 순서대로 점검하세요.
+1) ffmpeg 오류
+   - Windows: winget 또는 Microsoft Store에서 FFmpeg 설치 후 PowerShell 재시작
+   - macOS: `brew install ffmpeg` 후 터미널 재시작
+2) 포트 충돌(3001 사용 중)
+   - 다른 앱 종료 또는 실행 스크립트의 포트를 변경해 실행
+3) 권한 문제(Windows PowerShell 스크립트 실행 차단)
+   - 관리자 PowerShell에서 `Set-ExecutionPolicy RemoteSigned` 후 다시 시도
+4) 네트워크/403 오류
+   - URL 확인 → 잠시 후 재시도 → 다른 해상도/비트레이트 선택 후 시도
 
 
