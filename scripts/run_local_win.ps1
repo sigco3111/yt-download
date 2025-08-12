@@ -26,7 +26,7 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
   Write-Warning "FFmpeg가 필요합니다. winget 설치: winget install --id Gyan.FFmpeg -e (또는 Microsoft Store에서 FFmpeg 검색)"
 }
 
-# 프로젝트 루트 이동
+# 프로젝트 루트 이동(한글/공백 경로 대응)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Join-Path $ScriptDir '..'
 Set-Location $ProjectRoot
@@ -36,7 +36,13 @@ if (-not (Test-Path .venv)) {
   Write-Host "[정보] 가상환경 생성 중..." -ForegroundColor Green
   python -m venv .venv
 }
-. .\.venv\Scripts\Activate.ps1
+$ActivatePath = Join-Path $ProjectRoot '.venv\Scripts\Activate.ps1'
+if (-not (Test-Path $ActivatePath)) {
+  Write-Error "가상환경 활성화 스크립트를 찾을 수 없습니다: $ActivatePath"
+  exit 1
+}
+# dot-source로 현재 세션에 적용
+. "$ActivatePath"
 
 # 의존성 설치
 pip install --upgrade pip >$null 2>&1

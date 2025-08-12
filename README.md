@@ -90,6 +90,30 @@ chmod +x ./scripts/run_local_mac.sh
 
 실행 후 브라우저에서 `http://127.0.0.1:3001` 로 접속하세요.
 
+### Windows PowerShell 스크립트 실행/문제 해결
+
+- 관리자 PowerShell 권장. 실행 정책이 제한된 경우 아래를 먼저 실행:
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+- 실행 방법
+```powershell
+cd C:\work\yt-download   # 프로젝트 경로로 이동
+./scripts/run_local_win.ps1
+# 포트를 바꾸려면
+./scripts/run_local_win.ps1 -Port 3002
+```
+- 자주 발생하는 오류와 해결
+  - 실행 정책 오류(Restricted): 위의 `Set-ExecutionPolicy` 실행 후 PowerShell 재시작
+  - 스크립트를 로드할 수 없습니다: 동일하게 실행 정책 완화 필요
+  - 경로 문제(한글/공백 경로): 프로젝트를 `C:\work\yt-download` 같은 영문 경로로 이동하여 재시도
+  - Python/FFmpeg 미설치: 아래 명령으로 설치 후 재시도
+    ```powershell
+    winget install --id Python.Python.3.10 -e
+    winget install --id Gyan.FFmpeg -e
+    ```
+  - 기타: PowerShell 재시작 후 다시 시도. 문제가 지속되면 오류 메시지 전체와 함께 이슈로 남겨주세요.
+
 ## 구조(요약)
 - `server/app.py` — FastAPI + yt-dlp 백엔드(API + 정적 UI 서빙, SSE 진행률, 파일명/중복 처리, 결과 전송 후 폴더 정리)
 - `web/index.html` — 단일 파일 Web UI(포맷 조회/선택, 모달 진행률/속도/ETA 표시)
