@@ -90,6 +90,32 @@ chmod +x ./scripts/run_local_mac.sh
 
 실행 후 브라우저에서 `http://127.0.0.1:3001` 로 접속하세요.
 
+### Windows: uv로 설치/실행(대체 방법)
+```powershell
+# 0) (선택) 스크립트 실행 허용
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+# 1) Python 3.10+ 설치(없다면)
+winget install -e --id Python.Python.3.10
+
+# 2) uv 설치
+powershell -ExecutionPolicy Bypass -Command "iwr https://astral.sh/uv/install.ps1 -UseBasicParsing | iex"
+uv --version
+
+# 3) 프로젝트 의존성 설치(프로젝트 루트에서)
+cd C:\\work\\yt-download   # 실제 경로로 이동
+uv venv
+.\\.venv\\Scripts\\Activate.ps1
+uv pip install -r requirements.txt
+
+# 4) (권장) FFmpeg 설치 — MP3 변환에 필요
+winget install -e --id Gyan.FFmpeg
+
+# 5) 서버 실행
+uv run uvicorn server.app:app --host 127.0.0.1 --port 3001 --reload
+```
+브라우저에서 `http://127.0.0.1:3001` 접속
+
 ### Windows PowerShell 스크립트 실행/문제 해결
 
 - 관리자 PowerShell 권장. 실행 정책이 제한된 경우 아래를 먼저 실행:
